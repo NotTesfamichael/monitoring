@@ -9,14 +9,22 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # 1. Capture Docker Container Logs
+  # 1. Capture Docker Logs (Now with proper container names!)
   - job_name: docker
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: docker
-          __path__: /var/lib/docker/containers/*/*-json.log
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Extract the container name and remove the leading slash
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # Attach the log stream (stdout vs stderr)
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      # Attach the image name
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
 
   # 2. Capture SSH Logins (Auth Logs)
   - job_name: system-auth
@@ -25,8 +33,7 @@ scrape_configs:
           - localhost
         labels:
           job: system-auth
-          # Use /var/log/secure for RHEL/CentOS, or /var/log/auth.log for Ubuntu/Debian
-          __path__: /var/log/auth.log 
+          __path__: /var/log/auth.log  # Change to /var/log/secure if on RHEL/CentOS
 
   # 3. Capture User Commands via Auditd
   - job_name: system-audit

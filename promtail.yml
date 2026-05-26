@@ -1,0 +1,38 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # 1. Capture Docker Container Logs
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
+  # 2. Capture SSH Logins (Auth Logs)
+  - job_name: system-auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system-auth
+          # Use /var/log/secure for RHEL/CentOS, or /var/log/auth.log for Ubuntu/Debian
+          __path__: /var/log/auth.log 
+
+  # 3. Capture User Commands via Auditd
+  - job_name: system-audit
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system-audit
+          __path__: /var/log/audit/audit.log
